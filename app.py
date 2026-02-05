@@ -278,16 +278,18 @@ from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfigura
 # --- Memory Efficient Model Loading ---
 @st.cache_resource
 def load_my_unet_model():
-    # Mediapipe ke pass apna internal TFLite interpreter hota hai
-    # Jo bohot kam RAM leta hai
-    from mediapipe.tasks.python.core import base_options
-    
-    # Standard TFLite interpreter (is baar hum ise safely load karenge)
-    import tensorflow.lite as tflite
+    # Pehle koshish karein ke normal tflite load ho
+    try:
+        import tensorflow.lite as tflite
+    except ImportError:
+        # Agar na miley toh main tensorflow se nikalain
+        from tensorflow import lite as tflite
+        
     interpreter = tflite.Interpreter(model_path="iris_pure_float32.tflite")
     interpreter.allocate_tensors()
     return interpreter
 
+# Global call
 interpreter = load_my_unet_model()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
