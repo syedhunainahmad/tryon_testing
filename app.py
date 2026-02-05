@@ -1,28 +1,33 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
 import tflite_runtime.interpreter as tflite
 
 # --- 1. Resources Loading (Using tflite-runtime to avoid crash) ---
+# Mediapipe ko is tarah import karein taaki 'solutions' missing na ho
+import mediapipe as mp
+from mediapipe.python.solutions import face_mesh as mp_face_mesh
+
+# --- 1. Resources Loading ---
 @st.cache_resource
 def load_assets():
-    # Aapka UNet model load ho raha hai
+    # TFLite Interpreter (No TensorFlow for stability)
     interpreter = tflite.Interpreter(model_path="iris_pure_float32.tflite")
     interpreter.allocate_tensors()
     
-    # Lens image
+    # Lens texture loading
     lens_img = cv2.imread("images/1.png", cv2.IMREAD_UNCHANGED)
     return interpreter, lens_img
 
+# Initialize interpreter and assets
 interpreter, lens_img = load_assets()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# Mediapipe for Iris & Face tracking
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
+# --- 2. Mediapipe Face Mesh Setup ---
+# Direct class call karein taaki attribute error na aaye
+face_mesh_tool = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
