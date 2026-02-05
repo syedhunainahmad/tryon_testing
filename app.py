@@ -87,30 +87,43 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
         except: continue
     return frame
 
-# --- 4. Video Loop ---
 class VideoProcessor(VideoTransformerBase):
+    def __init__(self):
+        self.frame_count = 0
+
     def transform(self, frame):
+        self.frame_count += 1
         img = frame.to_ndarray(format="bgr24")
-        img = cv2.flip(img, 1)
         
-        # Scaling for speed on mobile
+        # Performance Fix 1: Resolution ko mazed kam karein process ke liye
+        # 320p processing ke liye kafi hai aur stuck nahi hone dega
         h_orig, w_orig = img.shape[:2]
-        img_proc = cv2.resize(img, (640, 480))
-        
-        rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
-        results = face_mesh.process(rgb)
-        
-        if results.multi_face_landmarks:
-            img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
+        img_proc = cv2.resize(img, (480, 360)) 
+        img_proc = cv2.flip(img_proc, 1)
+
+        # Performance Fix 2: Har 2nd ya 3rd frame process karein
+        # Is se camera smooth ho jayega aur filter thora slow update hoga lekin freeze nahi hoga
+        if self.frame_count % 2 == 0: 
+            rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
+            results = face_mesh_tool.process(rgb)
             
+            if results.multi_face_landmarks:
+                img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
+
+        # Display ke liye wapas bara kar dein
         return cv2.resize(img_proc, (w_orig, h_orig))
 
-RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
-
+# --- Streamer Settings ---
 webrtc_streamer(
     key="ttdeye-final",
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
-    media_stream_constraints={"video": True, "audio": False},
-    async_processing=True
+    media_stream_constraints={
+        "video": {
+            "width": {"ideal": 640}, 
+            "frameRate": {"ideal": 20} # FPS thora kam karne se stuck hona band ho jayega
+        },
+        "audio": False
+    },
+    async_processing=True, # Ye sabse zaroori hai stuck fix karne ke liye
 )
