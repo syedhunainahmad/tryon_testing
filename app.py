@@ -1,7 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
 
@@ -14,7 +14,7 @@ st.title("👁️ TTDEye Ultra-Realistic Lens Filter")
 # Model aur Lens ko cache karna taaki baar baar load na ho
 @st.cache_resource
 def load_assets():
-    interpreter = tf.lite.Interpreter(model_path="iris_pure_float32.tflite")
+    interpreter = tflite.Interpreter(model_path="iris_pure_float32.tflite")
     interpreter.allocate_tensors()
     lens_img = cv2.imread("images/1.png", cv2.IMREAD_UNCHANGED)
     return interpreter, lens_img
