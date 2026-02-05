@@ -3,6 +3,7 @@ import numpy as np
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
 import tflite_runtime.interpreter as tflite
+from av import VideoFrame
 
 # --- 1. Resources Loading (Using tflite-runtime to avoid crash) ---
 # Mediapipe ko is tarah import karein taaki 'solutions' missing na ho
@@ -88,32 +89,25 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
     return frame
 
 class VideoProcessor(VideoTransformerBase):
-    def __init__(self):
-        self.frame_count = 0
-
-    def transform(self, frame):
-        self.frame_count += 1
+    # 'transform' ki jagah 'recv' likhein
+    def recv(self, frame):
+        # Frame ko ndarray mein badlein
         img = frame.to_ndarray(format="bgr24")
+        img = cv2.flip(img, 1)
         
-        # Original size save karlein display ke liye
         h_orig, w_orig = img.shape[:2]
+        img_proc = cv2.resize(img, (640, 480))
         
-        # Speed Fix 1: Processing sirf 320p par karein (Bohot fast chalega)
-        img_proc = cv2.resize(img, (426, 240)) 
-        img_proc = cv2.flip(img_proc, 1)
-
-        # Speed Fix 2: Har 2nd frame process karein (CPU ko rest milega)
-        # Is se 'Stuck' hone ka masla hal ho jayega
-        if self.frame_count % 2 == 0:
-            rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
-            results = face_mesh_tool.process(rgb)
+        rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
+        results = face_mesh_tool.process(rgb)
+        
+        if results.multi_face_landmarks:
+            img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
             
-            if results.multi_face_landmarks:
-                # Aapka UNet model yahan call hoga
-                img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
+        img_final = cv2.resize(img_proc, (w_orig, h_orig))
 
-        # Quality Fix: Display ke liye wapas original size par le ayein
-        return cv2.resize(img_proc, (w_orig, h_orig))
+        # Naye tareeke mein VideoFrame object wapas bhejna hota hai
+        return VideoFrame.from_ndarray(img_final, format="bgr24")
 
 RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
 # --- Streamer Settings (Mobile Optimized) ---
