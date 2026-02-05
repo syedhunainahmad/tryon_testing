@@ -275,20 +275,20 @@ import numpy as np
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
 
-# --- Model Loading (The Professional Way to avoid Memory Crash) ---
+# --- Memory Efficient Model Loading ---
 @st.cache_resource
-def load_tflite_model():
-    # Mediapipe ki internal TFLite wrapper use kar rahe hain taaki RAM kam use ho
-    from mediapipe.tasks.python import core
-    from mediapipe.tasks.python import vision
+def load_my_unet_model():
+    # Mediapipe ke pass apna internal TFLite interpreter hota hai
+    # Jo bohot kam RAM leta hai
+    from mediapipe.tasks.python.core import base_options
     
-    # Simple Interpreter for TFLite (Low memory footprint)
-    import tensorflow.lite as tflite # Streamlit Cloud supports this inside mediapipe
+    # Standard TFLite interpreter (is baar hum ise safely load karenge)
+    import tensorflow.lite as tflite
     interpreter = tflite.Interpreter(model_path="iris_pure_float32.tflite")
     interpreter.allocate_tensors()
     return interpreter
 
-interpreter = load_tflite_model()
+interpreter = load_my_unet_model()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
