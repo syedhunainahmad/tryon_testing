@@ -4,4 +4,3 @@ mediapipe
 opencv-python-headless
 numpy
 aiortc
-tensorflow-cpu

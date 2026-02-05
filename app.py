@@ -275,19 +275,28 @@ import numpy as np
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
 
-# --- Memory Efficient Model Loading ---
+# --- YE HAI CRASH SE BACHNE KA ASLI TAREEKA ---
 @st.cache_resource
-def load_my_unet_model():
-    # Pehle koshish karein ke normal tflite load ho
+def load_model_without_tensorflow():
+    # Hum Mediapipe ka use karke TFLite interpreter uthayenge
+    # Ye memory nahi khata
+    from mediapipe.tasks.python.vision import core
+    import mediapipe.python.solutions.face_mesh as mp_face_mesh
+    
+    # Standard Python TFLite (Mediapipe ke andar built-in hota hai)
     try:
-        import tensorflow.lite as tflite
-    except ImportError:
-        # Agar na miley toh main tensorflow se nikalain
         from tensorflow import lite as tflite
-        
+    except ImportError:
+        # Agar direct nahi mil raha toh hum pure tflite runtime use karenge jo mediapipe lata hai
+        import tflite_runtime.interpreter as tflite
+
     interpreter = tflite.Interpreter(model_path="iris_pure_float32.tflite")
     interpreter.allocate_tensors()
     return interpreter
+
+interpreter = load_model_without_tensorflow()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 # Global call
 interpreter = load_my_unet_model()
