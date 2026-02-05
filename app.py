@@ -95,35 +95,39 @@ class VideoProcessor(VideoTransformerBase):
         self.frame_count += 1
         img = frame.to_ndarray(format="bgr24")
         
-        # Performance Fix 1: Resolution ko mazed kam karein process ke liye
-        # 320p processing ke liye kafi hai aur stuck nahi hone dega
+        # Original size save karlein display ke liye
         h_orig, w_orig = img.shape[:2]
-        img_proc = cv2.resize(img, (480, 360)) 
+        
+        # Speed Fix 1: Processing sirf 320p par karein (Bohot fast chalega)
+        img_proc = cv2.resize(img, (426, 240)) 
         img_proc = cv2.flip(img_proc, 1)
 
-        # Performance Fix 2: Har 2nd ya 3rd frame process karein
-        # Is se camera smooth ho jayega aur filter thora slow update hoga lekin freeze nahi hoga
-        if self.frame_count % 2 == 0: 
+        # Speed Fix 2: Har 2nd frame process karein (CPU ko rest milega)
+        # Is se 'Stuck' hone ka masla hal ho jayega
+        if self.frame_count % 2 == 0:
             rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
             results = face_mesh_tool.process(rgb)
             
             if results.multi_face_landmarks:
+                # Aapka UNet model yahan call hoga
                 img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
 
-        # Display ke liye wapas bara kar dein
+        # Quality Fix: Display ke liye wapas original size par le ayein
         return cv2.resize(img_proc, (w_orig, h_orig))
 
-# --- Streamer Settings ---
+RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
+# --- Streamer Settings (Mobile Optimized) ---
 webrtc_streamer(
-    key="ttdeye-final",
+    key="ttdeye-v3",
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
+    # Async processing on karne se UI freeze nahi hoti
+    async_processing=True,
     media_stream_constraints={
         "video": {
-            "width": {"ideal": 640}, 
-            "frameRate": {"ideal": 20} # FPS thora kam karne se stuck hona band ho jayega
+            "width": {"ideal": 640},
+            "frameRate": {"ideal": 20}
         },
         "audio": False
-    },
-    async_processing=True, # Ye sabse zaroori hai stuck fix karne ke liye
+    }
 )
