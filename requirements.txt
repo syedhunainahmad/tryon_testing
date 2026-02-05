@@ -2,6 +2,6 @@ streamlit
 streamlit-webrtc
 mediapipe
 opencv-python-headless
-tensorflow-cpu
+tflite-runtime
 numpy
 aiortc
