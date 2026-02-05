@@ -49,43 +49,63 @@ def predict_mask_with_model(crop):
 # --- 3. Lens Application (Hybrid: Model + Landmarks) ---
 def apply_hybrid_lens(frame, landmarks, lens_texture):
     h, w = frame.shape[:2]
-    # Eye indices for masking
-    EYE_INDICES = [
-        (468, 469, [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]), # Left
-        (473, 474, [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]) # Right
+    
+    # Aapka local code wala geometry
+    LEFT_EYE_POINTS = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+    RIGHT_EYE_POINTS = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+
+    eye_configs = [
+        (468, 159, 145, 469, LEFT_EYE_POINTS), 
+        (473, 386, 374, 474, RIGHT_EYE_POINTS) 
     ]
 
-    for iris_center, iris_edge, eye_pts in EYE_INDICES:
+    for iris_idx, top_idx, bot_idx, edge_idx, eye_pts in eye_configs:
         try:
-            cx, cy = int(landmarks[iris_center].x * w), int(landmarks[iris_center].y * h)
-            ex, ey = int(landmarks[iris_edge].x * w), int(landmarks[iris_edge].y * h)
-            r = int(np.sqrt((cx-ex)**2 + (cy-ey)**2) * 1.3)
+            cx = int(landmarks[iris_idx].x * w)
+            cy = int(landmarks[iris_idx].y * h)
+            
+            # Precise Sizing (Aapki local logic)
+            ex = int(landmarks[edge_idx].x * w)
+            ey = int(landmarks[edge_idx].y * h)
+            r = int(np.sqrt((cx - ex)**2 + (cy - ey)**2) * 1.25)
             
             y1, y2, x1, x2 = max(0, cy-r), min(h, cy+r), max(0, cx-r), min(w, cx+r)
             crop = frame[y1:y2, x1:x2].copy()
             if crop.size == 0: continue
-            
-            # --- MODEL INFERENCE ---
-            model_mask = predict_mask_with_model(crop)
-            
-            # Boundary mask (Eyelids)
-            eye_poly = np.array([[(landmarks[p].x*w - x1), (landmarks[p].y*h - y1)] for p in eye_pts], dtype=np.int32)
-            occ_mask = np.zeros(crop.shape[:2], dtype=np.uint8)
-            cv2.fillPoly(occ_mask, [eye_poly], 255)
-            
-            final_mask = cv2.bitwise_and(model_mask, occ_mask)
-            final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
+            ch, cw = crop.shape[:2]
 
-            # Blending
-            lens_res = cv2.resize(lens_texture, (x2-x1, y2-y1))
+            # 1. UNet Model Mask (Aapka trained model)
+            model_mask = predict_mask_with_model(crop) 
+            
+            # 2. Geometric Mask (Backup ke liye)
+            geo_mask = np.zeros((ch, cw), dtype=np.uint8)
+            cv2.circle(geo_mask, (cw//2, ch//2), int(r * 0.95), 255, -1)
+
+            # 3. Eyelid Occlusion (Palkon ke peeche)
+            eye_poly = np.array([[(landmarks[p].x*w - x1), (landmarks[p].y*h - y1)] for p in eye_pts], dtype=np.int32)
+            occlusion_mask = np.zeros((ch, cw), dtype=np.uint8)
+            cv2.fillPoly(occlusion_mask, [eye_poly], 255)
+
+            # 4. Hybrid Mask Combine
+            # Hum bitwise_or use kar rahe hain taaki agar model fail ho toh geo_mask kaam kare
+            final_mask = cv2.bitwise_and(cv2.bitwise_or(geo_mask, model_mask), occlusion_mask)
+            final_mask = cv2.GaussianBlur(final_mask, (7, 7), 0)
+
+            # 5. Advanced Blending (Aapki local advanced logic)
+            lens_res = cv2.resize(lens_texture, (cw, ch), interpolation=cv2.INTER_LANCZOS4)
             if lens_res.shape[2] == 4:
-                alpha = (lens_res[:, :, 3] / 255.0) * (final_mask / 255.0)
-                for c in range(3):
-                    crop_c = crop[:, :, c].astype(float)
-                    lens_c = lens_res[:, :, c].astype(float)
-                    crop[:, :, c] = (alpha * lens_c + (1 - alpha) * crop_c).astype(np.uint8)
-                frame[y1:y2, x1:x2] = crop
-        except: continue
+                alpha_tex = (lens_res[:, :, 3].astype(float) / 255.0)
+                alpha_final = alpha_tex * (final_mask.astype(float) / 255.0)
+                alpha_3d = cv2.merge([alpha_final] * 3)
+                
+                fg = lens_res[:, :, :3].astype(float) * alpha_3d
+                bg = crop.astype(float) * (1.0 - alpha_3d)
+                
+                # Blend aur Frame update
+                frame[y1:y2, x1:x2] = cv2.add(fg, bg).astype(np.uint8)
+
+        except Exception as e:
+            continue
     return frame
 
 class VideoProcessor(VideoTransformerBase):
