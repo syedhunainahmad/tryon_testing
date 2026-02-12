@@ -210,7 +210,7 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
             cv2.fillPoly(occlusion_mask, [eye_poly], 255)
 
             final_mask = cv2.bitwise_and(cv2.bitwise_or(geo_mask, model_mask), occlusion_mask)
-            final_mask = cv2.GaussianBlur(final_mask, (7, 7), 0)
+            final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
 
             lens_res = cv2.resize(lens_texture, (cw, ch), interpolation=cv2.INTER_AREA)
             if lens_res.shape[2] == 4:
