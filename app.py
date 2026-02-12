@@ -90,15 +90,31 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
 
             # 5. Advanced Blending (Aapki local advanced logic)
             lens_res = cv2.resize(lens_texture, (cw, ch), interpolation=cv2.INTER_LANCZOS4)
+            # if lens_res.shape[2] == 4:
+            #     alpha_tex = (lens_res[:, :, 3].astype(float) / 255.0)
+            #     alpha_final = alpha_tex * (final_mask.astype(float) / 255.0)
+            #     alpha_3d = cv2.merge([alpha_final] * 3)
+                
+            #     fg = lens_res[:, :, :3].astype(float) * alpha_3d
+            #     bg = crop.astype(float) * (1.0 - alpha_3d)
+                
+            #     # Blend aur Frame update
+            #     frame[y1:y2, x1:x2] = cv2.add(fg, bg).astype(np.uint8)
             if lens_res.shape[2] == 4:
+                # 3. Alpha calculation ko thora sharp banayein
+                # Hum 0.3 ki jagah 0.5 threshold use karenge taaki mask solid rahe
+                alpha_mask = (final_mask.astype(float) / 255.0)
+                
+                # Texture ki details bachane ke liye mask ko thora "punchy" banayein
+                alpha_mask = np.where(alpha_mask > 0.2, alpha_mask, 0) 
+
                 alpha_tex = (lens_res[:, :, 3].astype(float) / 255.0)
-                alpha_final = alpha_tex * (final_mask.astype(float) / 255.0)
+                alpha_final = alpha_tex * alpha_mask
                 alpha_3d = cv2.merge([alpha_final] * 3)
                 
                 fg = lens_res[:, :, :3].astype(float) * alpha_3d
                 bg = crop.astype(float) * (1.0 - alpha_3d)
                 
-                # Blend aur Frame update
                 frame[y1:y2, x1:x2] = cv2.add(fg, bg).astype(np.uint8)
 
         except Exception as e:
