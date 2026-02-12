@@ -86,7 +86,7 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
             # 4. Hybrid Mask Combine
             # Hum bitwise_or use kar rahe hain taaki agar model fail ho toh geo_mask kaam kare
             final_mask = cv2.bitwise_and(cv2.bitwise_or(geo_mask, model_mask), occlusion_mask)
-            final_mask = cv2.GaussianBlur(final_mask, (7, 7), 0)
+            final_mask = cv2.GaussianBlur(final_mask, (3, 3), 0)
 
             # 5. Advanced Blending (Aapki local advanced logic)
             lens_res = cv2.resize(lens_texture, (cw, ch), interpolation=cv2.INTER_LANCZOS4)
