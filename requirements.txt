@@ -6,4 +6,4 @@ numpy<2.0.0
 aiortc
 tflite-runtime
 av
-# tensorflow-cpu
+tensorflow-cpu
