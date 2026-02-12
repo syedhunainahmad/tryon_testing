@@ -156,10 +156,23 @@ from mediapipe.python.solutions import face_mesh as mp_face_mesh
 # --- 1. Resources Loading ---
 @st.cache_resource
 def load_assets():
-    # Full TensorFlow se interpreter load karein
-    interpreter = tf.lite.Interpreter(model_path="iris_pure_float32.tflite")
-    interpreter.allocate_tensors()
+    # Model ko pehle bytes mein read karein (Fixes Mmap error)
+    try:
+        with open("iris_pure_float32.tflite", "rb") as f:
+            model_content = f.read()
+        
+        # Interpreter ko model_content (bytes) se load karein
+        interpreter = tf.lite.Interpreter(model_content=model_content)
+        interpreter.allocate_tensors()
+    except Exception as e:
+        st.error(f"Model Load Error: {e}")
+        return None, None
+
+    # Lens texture loading
     lens_img = cv2.imread("images/1.png", cv2.IMREAD_UNCHANGED)
+    if lens_img is None:
+        st.error("Lens image not found! Check images/1.png path.")
+        
     return interpreter, lens_img
 
 interpreter, lens_img = load_assets()
