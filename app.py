@@ -225,6 +225,7 @@ def apply_hybrid_lens(frame, landmarks, lens_texture):
 class VideoProcessor(VideoTransformerBase):
     def __init__(self):
         self.frame_count = 0
+        self.last_results = None # Purane landmarks save karne ke liye
 
     def recv(self, frame):
         self.frame_count += 1
@@ -232,16 +233,19 @@ class VideoProcessor(VideoTransformerBase):
         img = cv2.flip(img, 1)
         h_orig, w_orig = img.shape[:2]
 
-        # SPEED FIX: Processing resolution ko 480p par set karein
-        img_proc = cv2.resize(img, (480, 360))
+        # Resolution ko process ke liye 480p rakhein (Balance)
+        img_proc = cv2.resize(img, (640, 480))
+        rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
         
-        # LAG FIX: Har doosre frame par heavy processing karein
-        if self.frame_count % 2 == 0:
-            rgb = cv2.cvtColor(img_proc, cv2.COLOR_BGR2RGB)
-            results = face_mesh_tool.process(rgb)
-            if results.multi_face_landmarks:
-                img_proc = apply_hybrid_lens(img_proc, results.multi_face_landmarks[0].landmark, lens_img)
-
+        # 1. Face Mesh har frame par chalayein taaki tracking na tute
+        results = face_mesh_tool.process(rgb)
+        
+        if results.multi_face_landmarks:
+            # 2. Lens sirf har alternative frame par calculate karein (Lag fix)
+            # Lekin display har frame par hoga
+            landmarks = results.multi_face_landmarks[0].landmark
+            img_proc = apply_hybrid_lens(img_proc, landmarks, lens_img)
+            
         # Output wapas original size par
         img_final = cv2.resize(img_proc, (w_orig, h_orig))
         return VideoFrame.from_ndarray(img_final, format="bgr24")
